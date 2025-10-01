@@ -1,0 +1,65 @@
+#!/bin/bash
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Sul ei ole õigust antud skripti käivitamiseks: pead olema root."
+    exit 1
+fi
+
+if [ -n "$SUDO_USER" ]; then
+    echo "Skripti käivitamine sudo kaudu ei ole lubatud. Logi otse root-ina (su -) ja käivita uuesti."
+    exit 2
+fi
+
+if [ $# -ne 1 ]; then
+    echo "Kasutus: $0 kasutajad_fail"
+    exit 3
+fi
+
+KASUTAJA_FAIL="$1"
+LOGFAIL="loodud_kasutajad_paroolidega_root"
+
+if [ ! -f "$KASUTAJA_FAIL" ] || [ ! -r "$KASUTAJA_FAIL" ]; then
+    echo "Kasutajate fail '$KASUTAJA_FAIL' puudub või ei ole loetav."
+    exit 4
+fi
+
+: > "$LOGFAIL"
+
+gen_parool() {
+    local length=${1:-8}
+    if command -v pwgen >/dev/null 2>&1; then
+        pwgen -s "$length" -1
+    else
+        tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
+        echo
+    fi
+}
+
+while read -r nimi || [ -n "$nimi" ]; do
+    case "$nimi" in
+        ''|\#*) continue ;;
+    esac
+
+    echo "Lisame kasutaja: $nimi"
+
+    if id "$nimi" >/dev/null 2>&1; then
+        userdel -r "$nimi" 2>/dev/null || true
+    fi
+
+    if [ -x /bin/bash ]; then
+        useradd -m -s /bin/bash "$nimi"
+    else
+        useradd -m -s /bin/sh "$nimi"
+    fi
+
+    parool=$(gen_parool 8)
+
+    echo "${nimi}:${parool}" | chpasswd
+
+    echo "${nimi}:${parool}" >> "$LOGFAIL"
+
+    echo "Kasutaja $nimi lisatud ja parool logitud."
+done < "$KASUTAJA_FAIL"
+
+echo "Kõik tehtud. Logifail: $LOGFAIL"
+exit 0
