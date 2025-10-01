@@ -1,0 +1,21 @@
+#!/bin/bash
+#Kasutajate lisamise skript failist
+
+if [ $# -ne 1 ]; then
+    echo "Kasutus: $0 failinimi"
+    exit 1
+fi
+
+failinimi=$1
+
+if [ -f "$failinimi" ]; then
+    while read nimi; do
+        if [ -n "$nimi" ]; then
+            echo "Lisame kasutaja: $nimi"
+            sh ./lisa_kasutaja "$nimi"
+        fi
+    done < "$failinimi"
+else
+    echo "Faili $failinimi ei leitud"
+    exit 2
+fi
