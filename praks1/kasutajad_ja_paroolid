@@ -1,0 +1,37 @@
+#!/bin/bash
+# Lisab süsteemi kasutajad failist ja määrab paroolid failist
+
+if [ $# -ne 2 ]; then
+    echo "Kasutus: $0 kasutajad_fail paroolid_fail"
+    exit 1
+fi
+
+fail_kasutajad=$1
+fail_paroolid=$2
+
+if [ ! -f "$fail_kasutajad" ]; then
+    echo "Kasutajate fail $fail_kasutajad ei leitud"
+    exit 2
+fi
+
+if [ ! -f "$fail_paroolid" ]; then
+    echo "Paroolide fail $fail_paroolid ei leitud"
+    exit 3
+fi
+
+paste "$fail_kasutajad" "$fail_paroolid" | while read nimi parool; do
+    if [ -n "$nimi" ] && [ -n "$parool" ]; then
+        echo "Lisame kasutaja: $nimi"
+
+        if id "$nimi" &>/dev/null; then
+            echo "Kasutaja $nimi juba eksisteerib, eemaldame..."
+	    userdel -r "$nimi" 2>/dev/null
+        fi
+
+        useradd -m "$nimi"
+
+        echo "$nimi:$parool" | chpasswd
+
+        echo "Kasutaja $nimi on lisatud koos parooliga."
+    fi
+done
