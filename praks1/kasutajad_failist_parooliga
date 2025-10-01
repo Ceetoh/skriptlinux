@@ -1,0 +1,34 @@
+#!/bin/bash
+# Täiendus eelmisest skriptist, lisab kasutajale ka parooli
+
+if [ $# -ne 1 ]; then
+    echo "Kasutus: $0 failinimi"
+    exit 1
+fi
+
+failinimi=$1
+
+if [ ! -f "$failinimi" ]; then
+    echo "Faili $failinimi ei leitud"
+    exit 2
+fi
+
+while read rida; do
+    if [ -n "$rida" ]; then
+        nimi=$(echo $rida | cut -d':' -f1)
+        parool=$(echo $rida | cut -d':' -f2)
+
+        echo "Lisame kasutaja: $nimi"
+
+        if id "$nimi" &>/dev/null; then
+            echo "Kasutaja $nimi juba eksisteerib, eemaldame..."
+            userdel -r "$nimi"
+        fi
+
+        useradd -m "$nimi"
+
+        echo "$nimi:$parool" | chpasswd
+
+        echo "Kasutaja $nimi on lisatud koos parooliga."
+    fi
+done < "$failinimi"
