@@ -1,0 +1,38 @@
+#!/bin/bash
+# Skript lisab süsteemi kasutajad failist ja genereerib neile paroolid
+# Logib kasutajanime ja parooli faili 'loodud_kasutajad_paroolidega'
+
+if [ $# -ne 1 ]; then
+    echo "Kasutus: $0 kasutajad_fail"
+    exit 1
+fi
+
+kasutajad_fail=$1
+logfail="loodud_kasutajad_paroolidega"
+
+if [ ! -f "$kasutajad_fail" ]; then
+    echo "Kasutajate fail $kasutajad_fail ei leitud"
+    exit 2
+fi
+
+> "$logfail"
+
+while read nimi; do
+    if [ -n "$nimi" ]; then
+        echo "Lisame kasutaja: $nimi"
+
+        if id "$nimi" &>/dev/null; then
+            userdel -r "$nimi" 2>/dev/null
+        fi
+
+        useradd -m "$nimi"
+
+        parool=$(pwgen -s 8 -1)
+
+        echo "$nimi:$parool" | chpasswd
+
+        echo "$nimi:$parool" >> "$logfail"
+
+        echo "Kasutaja $nimi lisatud ja parool logitud."
+    fi
+done < "$kasutajad_fail"
