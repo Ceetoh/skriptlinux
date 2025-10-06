@@ -5,7 +5,7 @@ ALLIKAS=~/skriptlinux/praks2/src
 SIHT=~/skriptlinux/praks2/backup
 KUUPAEV=$(date +"%d.%m.%Y_%H-%M")
 
-tar -I 'zstd -19 -T0' -cf "$SIHT/src_backup_$KUUPAEV.tar.zst" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
+tar --exclude='*.jpg' --exclude='bin' -I 'zstd -19 -T0' -cf "$SIHT/src_backup_$KUUPAEV.tar.zst" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
 
 if [ $? -eq 0 ]; then
     echo "Varukoopia loodud: $SIHT/src_backup_$KUUPAEV.tar.zst"
