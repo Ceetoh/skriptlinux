@@ -1,5 +1,4 @@
 #!/bin/bash
-
 mkdir -p ~/skriptlinux/praks2/backup
 
 ALLIKAS=~/skriptlinux/praks2/src
@@ -9,15 +8,20 @@ KUUPAEV=$(date +"%d.%m.%Y_%H-%M")
 tar -I 'zstd -19 -T0' -cf "$SIHT/src_backup_$KUUPAEV.tar.zst" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
 
 if [ $? -eq 0 ]; then
-    echo " Varukoopia loodud: $SIHT/src_backup_$KUUPAEV.tar.zst"
+    echo "Varukoopia loodud: $SIHT/src_backup_$KUUPAEV.tar.zst"
 else
-    echo " Varundamine ebaõnnestus!"
+    echo "Varundamine ebaõnnestus!"
     exit 1
 fi
 
 echo
-echo " Kontrollin loodud arhiivi sisu (esimesed 5 kirjet):"
+echo "Kontrollin loodud arhiivi sisu (esimesed 5 kirjet):"
 
 tar -I 'zstd -d' -tf "$SIHT/src_backup_$KUUPAEV.tar.zst" | head -n 5
 
-echo " Arhiiv kontrollitud — kui näed src/ alamkaustu, on kõik korras."
+echo "Arhiiv kontrollitud — kui näed src/ alamkaustu, on kõik korras."
+
+echo
+echo "Varukoopia suurus:"
+DU_SIZE=$(du -h "$SIHT/src_backup_$KUUPAEV.tar.zst" | awk '{print $1}')
+echo "$DU_SIZE"
