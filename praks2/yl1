@@ -12,4 +12,12 @@ if [ $? -eq 0 ]; then
     echo " Varukoopia loodud: $SIHT/src_backup_$KUUPAEV.tar.zst"
 else
     echo " Varundamine ebaõnnestus!"
+    exit 1
 fi
+
+echo
+echo " Kontrollin loodud arhiivi sisu (esimesed 5 kirjet):"
+
+tar -I 'zstd -d' -tf "$SIHT/src_backup_$KUUPAEV.tar.zst" | head -n 5
+
+echo " Arhiiv kontrollitud — kui näed src/ alamkaustu, on kõik korras."
