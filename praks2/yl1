@@ -25,3 +25,8 @@ echo
 echo "Varukoopia suurus:"
 DU_SIZE=$(du -h "$SIHT/src_backup_$KUUPAEV.tar.zst" | awk '{print $1}')
 echo "$DU_SIZE"
+
+echo
+echo "Hoian alles ainult 3 kõige uuemat varukoopiat..."
+ls -1t "$SIHT"/src_backup_*.tar.zst | tail -n +4 | xargs -r rm -f
+echo "Vanad varukoopiad kustutatud, alles 3 uusimat."
