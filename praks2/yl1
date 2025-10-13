@@ -2,26 +2,25 @@
 
 ALLIKAS=~/skriptlinux/praks2/src
 SIHT=~/skriptlinux/praks2/backup
+LOGDIR=~/skriptlinux/praks2/logs
+mkdir -p "$SIHT" "$LOGDIR"
+
 KUUPAEV=$(date +"%d.%m.%Y_%H-%M")
-
-mkdir -p "$SIHT"
-
-echo
-echo "Kuiv jooks: failide loend, mis läheks arhiivi"
-cd "$(dirname "$ALLIKAS")" || exit 1
-tar --exclude='*.jpg' --exclude='bin' -cf - "$(basename "$ALLIKAS")" | tar -tvf - | sed 's|'"$(basename "$ALLIKAS")"'|src|'
-
 ARHIV="$SIHT/src_backup_$KUUPAEV.tar.zst"
 
-tar --exclude='*.jpg' --exclude='bin' -I 'zstd -19 -T0' -cf "$ARHIV" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
+echo "[ $(date '+%F %T') ] BACKUP START" >> "$LOGDIR/backup.log"
 
+echo "Kuiv jooks: failide loend, mis läheks arhiivi"
+(cd "$(dirname "$ALLIKAS")" && find "$(basename "$ALLIKAS")" \( -name '*.jpg' -o -path "$(basename "$ALLIKAS")/bin" \) -prune -o -print)
+
+tar --exclude='*.jpg' --exclude='bin' -I 'zstd -19 -T0' -cf "$ARHIV" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
 if [ $? -ne 0 ]; then
-    echo
+    echo "[ $(date '+%F %T') ] BACKUP FAILED" >> "$LOGDIR/backup.log"
     echo "Varundamine ebaõnnestus!"
     exit 1
 fi
 
-echo
+echo "[ $(date '+%F %T') ] BACKUP SUCCESS" >> "$LOGDIR/backup.log"
 echo "Varukoopia loodud: $ARHIV"
 
 echo
@@ -38,3 +37,5 @@ echo
 echo "Hoian alles ainult 3 kõige uuemat varukoopiat..."
 ls -1t "$SIHT"/src_backup_*.tar.zst | tail -n +4 | xargs -r rm -f
 echo "Vanad varukoopiad kustutatud, alles 3 uusimat."
+
+echo "[ $(date '+%F %T') ] BACKUP END" >> "$LOGDIR/backup.log"
