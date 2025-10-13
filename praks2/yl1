@@ -1,58 +1,64 @@
 #!/bin/bash
 
-ALLIKAS="$HOME/skriptlinux/praks2/src"
-SIHT="$HOME/skriptlinux/praks2/backup"
+SRC="$HOME/skriptlinux/praks2/src"
+BACKUP="$HOME/skriptlinux/praks2/backup"
 LOGDIR="$HOME/skriptlinux/praks2/logs"
-KUUPAEV=$(date '+%d.%m.%Y_%H-%M')
-ARHIV="$SIHT/src_backup_$KUUPAEV.tar.zst"
-LOGFILE="$LOGDIR/backup.log"
 
-mkdir -p "$SIHT"
+mkdir -p "$BACKUP"
 mkdir -p "$LOGDIR"
 
-if [ ! -d "$ALLIKAS" ]; then
-    echo "Varundamine ebaõnnestus! Lähtekaust puudub: $ALLIKAS"
+DATE=$(date '+%d.%m.%Y_%H-%M')
+ARHIV_ZSTD="$BACKUP/src_backup_$DATE.tar.zst"
+ARHIV_GZ="$BACKUP/src_backup_$DATE.tar.gz"
+ARHIV_XZ="$BACKUP/src_backup_$DATE.tar.xz"
+SHA_FILE="$ARHIV_ZSTD.sha256"
+
+if [ ! -d "$SRC" ]; then
+    echo "Varundamine ebaõnnestus! Lähtekaust puudub: $SRC"
     exit 1
 fi
 
-VAJA=$(du -sb "$ALLIKAS" | awk '{print $1}')
-VABA=$(df -B1 "$SIHT" | awk 'NR==2{print $4}')
+SRC_SIZE=$(du -sb "$SRC" | awk '{print $1}')
+FREE_SPACE=$(df -B1 "$BACKUP" | awk 'NR==2{print $4}')
 
-if [ "$VAJA" -gt "$VABA" ]; then
-    echo "Varundamine ebaõnnestus! Vaba ruumi on liiga vähe."
+if [ "$FREE_SPACE" -lt "$SRC_SIZE" ]; then
+    echo "Varundamine ebaõnnestus! Ruumi ei piisa."
     exit 1
 fi
 
-echo "[ $(date '+%F %T') ] BACKUP START" >> "$LOGFILE"
+echo "[ $(date '+%F %T') ] BACKUP START" >> "$LOGDIR/backup.log"
 
 echo "Kuiv jooks: failide loend, mis läheks arhiivi"
-find "$ALLIKAS" -type f ! -name '*.jpg' ! -path '*/bin/*' | sed "s|$HOME/skriptlinux/praks2/||"
+find "$SRC" -type f ! -name '*.jpg' ! -path "$SRC/bin/*" | sed "s|$SRC/||"
 
-tar --exclude='*.jpg' --exclude='bin/*' -I 'zstd -19 -T0' -cf "$ARHIV" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
+tar --exclude='*.jpg' --exclude='bin/*' -I 'zstd -19 -T0' -cf "$ARHIV_ZSTD" -C "$SRC" .
+tar -cf - -C "$SRC" . | gzip > "$ARHIV_GZ"
+tar -cf - -C "$SRC" . | xz > "$ARHIV_XZ"
+
 if [ $? -ne 0 ]; then
     echo "Varundamine ebaõnnestus!"
     exit 1
 fi
 
-echo "[ $(date '+%F %T') ] BACKUP SUCCESS" >> "$LOGFILE"
-echo "Varukoopia loodud: $ARHIV"
+echo "[ $(date '+%F %T') ] BACKUP SUCCESS" >> "$LOGDIR/backup.log"
+
+echo "Varukoopia loodud: $ARHIV_ZSTD, $ARHIV_GZ, $ARHIV_XZ"
 
 echo
-echo "Kontrollin loodud arhiivi sisu (esimesed 5 kirjet):"
-tar -I 'zstd -d' -tf "$ARHIV" | head -n 5
+echo "Kontrollin loodud arhiivi sisu (esimesed 5 kirjet zstd):"
+tar -I 'zstd -d' -tf "$ARHIV_ZSTD" | head -n 5
 echo "Arhiiv kontrollitud — kui näed src/ alamkaustu, on kõik korras."
 
 echo
 echo "Varukoopia suurus:"
-DU_SIZE=$(du -h "$ARHIV" | awk '{print $1}')
-echo "$DU_SIZE"
+du -h "$ARHIV_ZSTD" "$ARHIV_GZ" "$ARHIV_XZ" | awk '{print $1, $2}'
 
 echo
-echo "Hoian alles ainult 3 kõige uuemat varukoopiat..."
-ls -1t "$SIHT"/src_backup_*.tar.zst | tail -n +4 | xargs -r rm -f
+echo "Hoian alles ainult 3 kõige uuemat zstd arhiivi..."
+ls -1t "$BACKUP"/src_backup_*.tar.zst | tail -n +4 | xargs -r rm -f
 echo "Vanad varukoopiad kustutatud, alles 3 uusimat."
 
-sha256sum "$ARHIV" > "$ARHIV.sha256"
-sha256sum -c "$ARHIV.sha256"
+sha256sum "$ARHIV_ZSTD" > "$SHA_FILE"
+sha256sum -c "$SHA_FILE"
 
-echo "[ $(date '+%F %T') ] BACKUP END" >> "$LOGFILE"
+echo "[ $(date '+%F %T') ] BACKUP END" >> "$LOGDIR/backup.log"
