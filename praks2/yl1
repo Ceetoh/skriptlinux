@@ -3,19 +3,29 @@
 ALLIKAS=~/skriptlinux/praks2/src
 SIHT=~/skriptlinux/praks2/backup
 LOGDIR=~/skriptlinux/praks2/logs
-mkdir -p "$SIHT" "$LOGDIR"
-
 KUUPAEV=$(date +"%d.%m.%Y_%H-%M")
 ARHIV="$SIHT/src_backup_$KUUPAEV.tar.zst"
+
+mkdir -p "$SIHT" "$LOGDIR"
+
+VABA_RUUM=$(df -B1 "$SIHT" | awk 'NR==2{print $4}')
+KAUST_SUURUS=$(du -sb "$ALLIKAS" | awk '{print $1}')
+
+if [ "$VABA_RUUM" -lt "$KAUST_SUURUS" ]; then
+    echo "[ $(date '+%F %T') ] BACKUP FAIL: puudub piisav ruum" >> "$LOGDIR/backup.log"
+    echo "Varundamine ebaõnnestus! Puudub piisav vaba ruum."
+    exit 1
+fi
 
 echo "[ $(date '+%F %T') ] BACKUP START" >> "$LOGDIR/backup.log"
 
 echo "Kuiv jooks: failide loend, mis läheks arhiivi"
-(cd "$(dirname "$ALLIKAS")" && find "$(basename "$ALLIKAS")" \( -name '*.jpg' -o -path "$(basename "$ALLIKAS")/bin" \) -prune -o -print)
+find "$ALLIKAS" \( -name '*.jpg' -o -path "$ALLIKAS/bin*" \) -prune -o -print | sed "s|$ALLIKAS|src|"
 
 tar --exclude='*.jpg' --exclude='bin' -I 'zstd -19 -T0' -cf "$ARHIV" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
+
 if [ $? -ne 0 ]; then
-    echo "[ $(date '+%F %T') ] BACKUP FAILED" >> "$LOGDIR/backup.log"
+    echo "[ $(date '+%F %T') ] BACKUP FAIL" >> "$LOGDIR/backup.log"
     echo "Varundamine ebaõnnestus!"
     exit 1
 fi
