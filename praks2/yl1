@@ -1,64 +1,76 @@
 #!/bin/bash
 
 SRC="$HOME/skriptlinux/praks2/src"
-BACKUP="$HOME/skriptlinux/praks2/backup"
+SIHT="$HOME/skriptlinux/praks2/backup"
+KUUPAEV=$(date '+%d.%m.%Y_%H-%M')
 LOGDIR="$HOME/skriptlinux/praks2/logs"
+BACKUPIGNORE="$SRC/.backupignore"
 
-mkdir -p "$BACKUP"
-mkdir -p "$LOGDIR"
-
-DATE=$(date '+%d.%m.%Y_%H-%M')
-ARHIV_ZSTD="$BACKUP/src_backup_$DATE.tar.zst"
-ARHIV_GZ="$BACKUP/src_backup_$DATE.tar.gz"
-ARHIV_XZ="$BACKUP/src_backup_$DATE.tar.xz"
-SHA_FILE="$ARHIV_ZSTD.sha256"
+mkdir -p "$SIHT" "$LOGDIR"
 
 if [ ! -d "$SRC" ]; then
     echo "Varundamine ebaõnnestus! Lähtekaust puudub: $SRC"
     exit 1
 fi
 
-SRC_SIZE=$(du -sb "$SRC" | awk '{print $1}')
-FREE_SPACE=$(df -B1 "$BACKUP" | awk 'NR==2{print $4}')
+echo "[ $(date '+%F %T') ] BACKUP START" >> "$LOGDIR/backup.log"
 
-if [ "$FREE_SPACE" -lt "$SRC_SIZE" ]; then
-    echo "Varundamine ebaõnnestus! Ruumi ei piisa."
+DU_SRC=$(du -sb "$SRC" | awk '{print $1}')
+DF_FREE=$(df -B1 "$SIHT" | awk 'NR==2{print $4}')
+
+if [ "$DF_FREE" -le "$DU_SRC" ]; then
+    echo "Varundamine ebaõnnestus! Liiga vähe vaba ruumi."
     exit 1
 fi
 
-echo "[ $(date '+%F %T') ] BACKUP START" >> "$LOGDIR/backup.log"
-
 echo "Kuiv jooks: failide loend, mis läheks arhiivi"
-find "$SRC" -type f ! -name '*.jpg' ! -path "$SRC/bin/*" | sed "s|$SRC/||"
+if [ -f "$BACKUPIGNORE" ]; then
+    find "$SRC" -type f | sed "s|$SRC/||" | grep -vFf "$BACKUPIGNORE"
+else
+    find "$SRC" -type f | sed "s|$SRC/||"
+fi
 
-tar --exclude='*.jpg' --exclude='bin/*' -I 'zstd -19 -T0' -cf "$ARHIV_ZSTD" -C "$SRC" .
-tar -cf - -C "$SRC" . | gzip > "$ARHIV_GZ"
-tar -cf - -C "$SRC" . | xz > "$ARHIV_XZ"
+TAR_EXCLUDE=""
+if [ -f "$BACKUPIGNORE" ]; then
+    TAR_EXCLUDE="--exclude-from=$BACKUPIGNORE"
+fi
+
+ARHIV_ZST="$SIHT/src_backup_$KUUPAEV.tar.zst"
+ARHIV_GZ="$SIHT/src_backup_$KUUPAEV.tar.gz"
+ARHIV_XZ="$SIHT/src_backup_$KUUPAEV.tar.xz"
+
+tar $TAR_EXCLUDE -I 'zstd -19 -T0' -cf "$ARHIV_ZST" -C "$SRC" .
+tar $TAR_EXCLUDE -z -cf "$ARHIV_GZ" -C "$SRC" .
+tar $TAR_EXCLUDE -J -cf "$ARHIV_XZ" -C "$SRC" .
 
 if [ $? -ne 0 ]; then
     echo "Varundamine ebaõnnestus!"
     exit 1
 fi
 
-echo "[ $(date '+%F %T') ] BACKUP SUCCESS" >> "$LOGDIR/backup.log"
+sha256sum "$ARHIV_ZST" > "$ARHIV_ZST.sha256"
+sha256sum "$ARHIV_GZ" > "$ARHIV_GZ.sha256"
+sha256sum "$ARHIV_XZ" > "$ARHIV_XZ.sha256"
 
-echo "Varukoopia loodud: $ARHIV_ZSTD, $ARHIV_GZ, $ARHIV_XZ"
+echo "[ $(date '+%F %T') ] BACKUP SUCCESS" >> "$LOGDIR/backup.log"
+echo "Varukoopia loodud: $ARHIV_ZST, $ARHIV_GZ, $ARHIV_XZ"
 
 echo
 echo "Kontrollin loodud arhiivi sisu (esimesed 5 kirjet zstd):"
-tar -I 'zstd -d' -tf "$ARHIV_ZSTD" | head -n 5
+tar -I 'zstd -d' -tf "$ARHIV_ZST" | head -n 5
 echo "Arhiiv kontrollitud — kui näed src/ alamkaustu, on kõik korras."
 
 echo
 echo "Varukoopia suurus:"
-du -h "$ARHIV_ZSTD" "$ARHIV_GZ" "$ARHIV_XZ" | awk '{print $1, $2}'
+du -h "$ARHIV_ZST" "$ARHIV_GZ" "$ARHIV_XZ"
 
 echo
 echo "Hoian alles ainult 3 kõige uuemat zstd arhiivi..."
-ls -1t "$BACKUP"/src_backup_*.tar.zst | tail -n +4 | xargs -r rm -f
+ls -1t "$SIHT"/src_backup_*.tar.zst | tail -n +4 | xargs -r rm -f
 echo "Vanad varukoopiad kustutatud, alles 3 uusimat."
 
-sha256sum "$ARHIV_ZSTD" > "$SHA_FILE"
-sha256sum -c "$SHA_FILE"
+for ARHIV in "$ARHIV_ZST" "$ARHIV_GZ" "$ARHIV_XZ"; do
+    sha256sum -c "$ARHIV.sha256" || echo "Hoiatus: $ARHIV kontrollsumma ebaõnnestus!"
+done
 
 echo "[ $(date '+%F %T') ] BACKUP END" >> "$LOGDIR/backup.log"
