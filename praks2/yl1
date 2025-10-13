@@ -1,29 +1,37 @@
 #!/bin/bash
-mkdir -p ~/skriptlinux/praks2/backup
 
 ALLIKAS=~/skriptlinux/praks2/src
 SIHT=~/skriptlinux/praks2/backup
 KUUPAEV=$(date +"%d.%m.%Y_%H-%M")
 
-tar --exclude='*.jpg' --exclude='bin' -I 'zstd -19 -T0' -cf "$SIHT/src_backup_$KUUPAEV.tar.zst" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
+mkdir -p "$SIHT"
 
-if [ $? -eq 0 ]; then
-    echo "Varukoopia loodud: $SIHT/src_backup_$KUUPAEV.tar.zst"
-else
+echo
+echo "Kuiv jooks: failide loend, mis läheks arhiivi"
+cd "$(dirname "$ALLIKAS")" || exit 1
+tar --exclude='*.jpg' --exclude='bin' -cf - "$(basename "$ALLIKAS")" | tar -tvf - | sed 's|'"$(basename "$ALLIKAS")"'|src|'
+
+ARHIV="$SIHT/src_backup_$KUUPAEV.tar.zst"
+
+tar --exclude='*.jpg' --exclude='bin' -I 'zstd -19 -T0' -cf "$ARHIV" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
+
+if [ $? -ne 0 ]; then
+    echo
     echo "Varundamine ebaõnnestus!"
     exit 1
 fi
 
 echo
+echo "Varukoopia loodud: $ARHIV"
+
+echo
 echo "Kontrollin loodud arhiivi sisu (esimesed 5 kirjet):"
-
-tar -I 'zstd -d' -tf "$SIHT/src_backup_$KUUPAEV.tar.zst" | head -n 5
-
+tar -I 'zstd -d' -tf "$ARHIV" | head -n 5
 echo "Arhiiv kontrollitud — kui näed src/ alamkaustu, on kõik korras."
 
 echo
 echo "Varukoopia suurus:"
-DU_SIZE=$(du -h "$SIHT/src_backup_$KUUPAEV.tar.zst" | awk '{print $1}')
+DU_SIZE=$(du -h "$ARHIV" | awk '{print $1}')
 echo "$DU_SIZE"
 
 echo
