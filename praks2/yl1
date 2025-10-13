@@ -1,36 +1,40 @@
 #!/bin/bash
 
-ALLIKAS=~/skriptlinux/praks2/src
-SIHT=~/skriptlinux/praks2/backup
-LOGDIR=~/skriptlinux/praks2/logs
-KUUPAEV=$(date +"%d.%m.%Y_%H-%M")
+ALLIKAS="$HOME/skriptlinux/praks2/src"
+SIHT="$HOME/skriptlinux/praks2/backup"
+LOGDIR="$HOME/skriptlinux/praks2/logs"
+KUUPAEV=$(date '+%d.%m.%Y_%H-%M')
 ARHIV="$SIHT/src_backup_$KUUPAEV.tar.zst"
+LOGFILE="$LOGDIR/backup.log"
 
-mkdir -p "$SIHT" "$LOGDIR"
+mkdir -p "$SIHT"
+mkdir -p "$LOGDIR"
 
-VABA_RUUM=$(df -B1 "$SIHT" | awk 'NR==2{print $4}')
-KAUST_SUURUS=$(du -sb "$ALLIKAS" | awk '{print $1}')
-
-if [ "$VABA_RUUM" -lt "$KAUST_SUURUS" ]; then
-    echo "[ $(date '+%F %T') ] BACKUP FAIL: puudub piisav ruum" >> "$LOGDIR/backup.log"
-    echo "Varundamine ebaõnnestus! Puudub piisav vaba ruum."
+if [ ! -d "$ALLIKAS" ]; then
+    echo "Varundamine ebaõnnestus! Lähtekaust puudub: $ALLIKAS"
     exit 1
 fi
 
-echo "[ $(date '+%F %T') ] BACKUP START" >> "$LOGDIR/backup.log"
+VAJA=$(du -sb "$ALLIKAS" | awk '{print $1}')
+VABA=$(df -B1 "$SIHT" | awk 'NR==2{print $4}')
+
+if [ "$VAJA" -gt "$VABA" ]; then
+    echo "Varundamine ebaõnnestus! Vaba ruumi on liiga vähe."
+    exit 1
+fi
+
+echo "[ $(date '+%F %T') ] BACKUP START" >> "$LOGFILE"
 
 echo "Kuiv jooks: failide loend, mis läheks arhiivi"
-find "$ALLIKAS" \( -name '*.jpg' -o -path "$ALLIKAS/bin*" \) -prune -o -print | sed "s|$ALLIKAS|src|"
+find "$ALLIKAS" -type f ! -name '*.jpg' ! -path '*/bin/*' | sed "s|$HOME/skriptlinux/praks2/||"
 
-tar --exclude='*.jpg' --exclude='bin' -I 'zstd -19 -T0' -cf "$ARHIV" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
-
+tar --exclude='*.jpg' --exclude='bin/*' -I 'zstd -19 -T0' -cf "$ARHIV" -C "$(dirname "$ALLIKAS")" "$(basename "$ALLIKAS")"
 if [ $? -ne 0 ]; then
-    echo "[ $(date '+%F %T') ] BACKUP FAIL" >> "$LOGDIR/backup.log"
     echo "Varundamine ebaõnnestus!"
     exit 1
 fi
 
-echo "[ $(date '+%F %T') ] BACKUP SUCCESS" >> "$LOGDIR/backup.log"
+echo "[ $(date '+%F %T') ] BACKUP SUCCESS" >> "$LOGFILE"
 echo "Varukoopia loodud: $ARHIV"
 
 echo
@@ -48,4 +52,7 @@ echo "Hoian alles ainult 3 kõige uuemat varukoopiat..."
 ls -1t "$SIHT"/src_backup_*.tar.zst | tail -n +4 | xargs -r rm -f
 echo "Vanad varukoopiad kustutatud, alles 3 uusimat."
 
-echo "[ $(date '+%F %T') ] BACKUP END" >> "$LOGDIR/backup.log"
+sha256sum "$ARHIV" > "$ARHIV.sha256"
+sha256sum -c "$ARHIV.sha256"
+
+echo "[ $(date '+%F %T') ] BACKUP END" >> "$LOGFILE"
